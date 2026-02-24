@@ -368,6 +368,36 @@
     line-height: 1.5;
   }
 
+  /* Date/time pickers */
+  input[type="date"], input[type="time"] {
+    color-scheme: dark;
+    cursor: pointer;
+  }
+  input[type="date"]::-webkit-calendar-picker-indicator,
+  input[type="time"]::-webkit-calendar-picker-indicator {
+    filter: invert(0.7) sepia(1) saturate(2) hue-rotate(175deg);
+    cursor: pointer;
+  }
+
+  /* Register Now CTA button on flyer */
+  .flyer-register-btn {
+    display: inline-block;
+    margin-top: 16px;
+    padding: 15px 36px;
+    background: linear-gradient(135deg, var(--yellow) 0%, #f0a500 100%);
+    color: var(--navy);
+    font-family: 'Nunito', sans-serif;
+    font-weight: 900;
+    font-size: 1.05rem;
+    border-radius: 50px;
+    text-decoration: none;
+    letter-spacing: 0.5px;
+    box-shadow: 0 6px 24px rgba(245,200,66,0.45), 0 2px 8px rgba(0,0,0,0.3);
+    transition: all 0.2s;
+    cursor: pointer;
+    text-transform: uppercase;
+  }
+
   .flyer-date-row {
     display: flex;
     align-items: center;
@@ -671,7 +701,7 @@
 
     <div class="field-group">
       <label>Announcement Type</label>
-      <select id="flyer-type" onchange="updatePlaceholders()">
+      <select id="flyer-type" onchange="updatePlaceholders(); updateTagFromType();">
         <option value="new_course">📚 New Course</option>
         <option value="live_session">📅 Live / Instructor-Led Session</option>
         <option value="new_feature">✨ New Feature / Toolkit</option>
@@ -715,11 +745,21 @@
     <div class="field-row">
       <div class="field-group">
         <label>Date</label>
-        <input type="text" id="event-date" placeholder="Friday, Jan 23" />
+        <input type="date" id="event-date" />
       </div>
       <div class="field-group">
-        <label>Time</label>
-        <input type="text" id="event-time" placeholder="11:00 AM – 12:00 PM CT" />
+        <label>Start Time</label>
+        <input type="time" id="event-time" />
+      </div>
+    </div>
+    <div class="field-row">
+      <div class="field-group">
+        <label>End Time <span style="color:#8899bb;font-weight:400;text-transform:none;">(optional)</span></label>
+        <input type="time" id="event-time-end" />
+      </div>
+      <div class="field-group">
+        <label>Timezone <span style="color:#8899bb;font-weight:400;text-transform:none;">(optional)</span></label>
+        <input type="text" id="event-tz" placeholder="CT, EST, PST..." />
       </div>
     </div>
 
@@ -731,6 +771,11 @@
     <div class="field-group">
       <label>WorkRamp / Registration Link</label>
       <input type="text" id="link" placeholder="https://..." />
+    </div>
+
+    <div class="field-group" id="btn-label-group" style="display:none;">
+      <label>Button Label</label>
+      <input type="text" id="btn-label" placeholder="Register Now" value="Register Now" />
     </div>
 
     <hr class="divider">
@@ -874,10 +919,33 @@ function generateFlyer() {
   const subtitle = document.getElementById('subtitle').value.trim();
   const description = document.getElementById('description').value.trim();
   const bullets = getBullets();
-  const date = document.getElementById('event-date').value.trim();
-  const time = document.getElementById('event-time').value.trim();
+  // Format date nicely: "Friday, Jan 23"
+  const rawDate = document.getElementById('event-date').value;
+  let date = '';
+  if (rawDate) {
+    const d = new Date(rawDate + 'T00:00:00');
+    date = d.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
+  }
+  // Format time: "11:00 AM – 12:00 PM CT"
+  const rawTime = document.getElementById('event-time').value;
+  const rawTimeEnd = document.getElementById('event-time-end').value;
+  const tz = document.getElementById('event-tz').value.trim();
+  function fmt12(t) {
+    if (!t) return '';
+    const [h, m] = t.split(':').map(Number);
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    const h12 = h % 12 || 12;
+    return `${h12}:${String(m).padStart(2,'0')} ${ampm}`;
+  }
+  let time = '';
+  if (rawTime) {
+    time = fmt12(rawTime);
+    if (rawTimeEnd) time += ` – ${fmt12(rawTimeEnd)}`;
+    if (tz) time += ` ${tz}`;
+  }
   const cta = document.getElementById('cta').value.trim();
   const link = document.getElementById('link').value.trim();
+  const btnLabel = document.getElementById('btn-label').value.trim() || 'Register Now';
 
   if (!title) {
     setStatus('Please enter a title first.', 'error');
@@ -901,9 +969,9 @@ function generateFlyer() {
     canvas.appendChild(wrapper);
 
     const buildInto = wrapper;
-    _buildFlyerContent(buildInto, tag, title, subtitle, description, bullets, date, time, cta, link);
+    _buildFlyerContent(buildInto, tag, title, subtitle, description, bullets, date, time, cta, link, null, null, btnLabel);
     _appendFooter(canvas);
-    buildSlackMessage(tag, title, subtitle, description, bullets, date, time, cta, link);
+    buildSlackMessage(tag, title, subtitle, description, bullets, date, time, cta, link, btnLabel);
     setStatus('Flyer generated!', 'success');
     return;
   }
@@ -917,9 +985,9 @@ function generateFlyer() {
   }
 
   // ---- Build main content ----
-  _buildFlyerContent(canvas, tag, title, subtitle, description, bullets, date, time, cta, link, uploadedImageSrc, selectedPos);
+  _buildFlyerContent(canvas, tag, title, subtitle, description, bullets, date, time, cta, link, uploadedImageSrc, selectedPos, btnLabel);
   _appendFooter(canvas);
-  buildSlackMessage(tag, title, subtitle, description, bullets, date, time, cta, link);
+  buildSlackMessage(tag, title, subtitle, description, bullets, date, time, cta, link, btnLabel);
   setStatus('Flyer generated!', 'success');
 }
 
@@ -930,7 +998,8 @@ function _appendFooter(canvas) {
   canvas.appendChild(footer);
 }
 
-function _buildFlyerContent(canvas, tag, title, subtitle, description, bullets, date, time, cta, link, imgSrc, imgPos) {
+function _buildFlyerContent(canvas, tag, title, subtitle, description, bullets, date, time, cta, link, imgSrc, imgPos, btnLabel) {
+  btnLabel = btnLabel || 'Register Now';
   // Build flyer HTML
   if (tag) {
     const tagEl = document.createElement('div');
@@ -992,15 +1061,32 @@ function _buildFlyerContent(canvas, tag, title, subtitle, description, bullets, 
     canvas.appendChild(dateRow);
   }
 
+  const ctaWrapper = document.createElement('div');
+  ctaWrapper.className = 'flyer-cta';
+  ctaWrapper.style.marginTop = 'auto';
+  ctaWrapper.style.paddingTop = '18px';
+
   if (cta) {
-    const ctaEl = document.createElement('div');
-    ctaEl.className = 'flyer-cta';
-    ctaEl.innerHTML = cta + (link ? `<br><span style="font-size:0.85rem;color:rgba(255,255,255,0.5);font-weight:600;">🔗 ${link}</span>` : '');
-    canvas.appendChild(ctaEl);
+    const ctaText = document.createElement('div');
+    ctaText.textContent = cta;
+    ctaWrapper.appendChild(ctaText);
   }
+
+  if (link) {
+    const btn = document.createElement('a');
+    btn.href = link;
+    btn.target = '_blank';
+    btn.rel = 'noopener noreferrer';
+    btn.className = 'flyer-register-btn';
+    btn.textContent = btnLabel;
+    ctaWrapper.appendChild(btn);
+  }
+
+  if (cta || link) canvas.appendChild(ctaWrapper);
 }
 
-function buildSlackMessage(tag, title, subtitle, description, bullets, date, time, cta, link) {
+function buildSlackMessage(tag, title, subtitle, description, bullets, date, time, cta, link, btnLabel) {
+  btnLabel = btnLabel || 'Register Now';
   const lines = [];
   if (tag) lines.push(`*${tag}*`);
   if (title) lines.push(`*${title}*`);
@@ -1013,7 +1099,7 @@ function buildSlackMessage(tag, title, subtitle, description, bullets, date, tim
   }
   if (date || time) lines.push(`📅 *${[date, time].filter(Boolean).join(' · ')}*`);
   if (cta) lines.push(`\n${cta}`);
-  if (link) lines.push(link);
+  if (link) lines.push(`🔗 ${btnLabel}: ${link}`);
 
   document.getElementById('slack-preview').style.display = 'block';
   document.getElementById('slack-msg-text').textContent = lines.join('\n');
@@ -1122,9 +1208,38 @@ function setStatus(msg, type) {
   if (msg && type === 'success') setTimeout(() => { el.textContent = ''; el.className = 'status-bar'; }, 3000);
 }
 
+const TYPE_TAGS = {
+  new_course:    'NEW COURSE ALERT',
+  live_session:  'JOIN THE CONVERSATION...',
+  new_feature:   'INTRODUCING...',
+  reminder:      'LAST CHANCE...',
+};
+
+function updateTagFromType() {
+  const type = document.getElementById('flyer-type').value;
+  const tagInput = document.getElementById('tag');
+  // Only auto-fill if the field is empty or still matches a default tag value
+  const isDefault = Object.values(TYPE_TAGS).includes(tagInput.value.trim()) || tagInput.value.trim() === '';
+  if (isDefault) {
+    tagInput.value = TYPE_TAGS[type] || '';
+  }
+}
+
 function updatePlaceholders() {
   // Could customize placeholders per type — left for extension
 }
+
+// Show button label field only when a link is entered
+document.addEventListener('DOMContentLoaded', () => {
+  // Set default tag on load
+  updateTagFromType();
+
+  const linkInput = document.getElementById('link');
+  const btnLabelGroup = document.getElementById('btn-label-group');
+  linkInput.addEventListener('input', () => {
+    btnLabelGroup.style.display = linkInput.value.trim() ? 'block' : 'none';
+  });
+});
 </script>
 </body>
 </html>
