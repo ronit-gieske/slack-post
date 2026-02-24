@@ -739,6 +739,11 @@
     </div>
     <button class="add-bullet" onclick="addBullet()" style="width:100%;margin-top:8px;height:34px;border-radius:9px;">+ Add Bullet</button>
 
+    <div class="field-group" style="margin-top:16px;">
+      <label>Additional Message <span style="color:#8899bb;font-weight:400;text-transform:none;">(optional)</span></label>
+      <textarea id="extra-message" placeholder="e.g. So teams don't need to re-train, repeat, or go hunting for information again." style="font-style:italic;"></textarea>
+    </div>
+
     <hr class="divider">
     <div class="section-label">Optional Details</div>
 
@@ -943,6 +948,7 @@ function generateFlyer() {
     if (rawTimeEnd) time += ` – ${fmt12(rawTimeEnd)}`;
     if (tz) time += ` ${tz}`;
   }
+  const extraMessage = document.getElementById('extra-message').value.trim();
   const cta = document.getElementById('cta').value.trim();
   const link = document.getElementById('link').value.trim();
   const btnLabel = document.getElementById('btn-label').value.trim() || 'Register Now';
@@ -969,9 +975,9 @@ function generateFlyer() {
     canvas.appendChild(wrapper);
 
     const buildInto = wrapper;
-    _buildFlyerContent(buildInto, tag, title, subtitle, description, bullets, date, time, cta, link, null, null, btnLabel);
+    _buildFlyerContent(buildInto, tag, title, subtitle, description, bullets, date, time, cta, link, null, null, btnLabel, extraMessage);
     _appendFooter(canvas);
-    buildSlackMessage(tag, title, subtitle, description, bullets, date, time, cta, link, btnLabel);
+    buildSlackMessage(tag, title, subtitle, description, bullets, date, time, cta, link, btnLabel, extraMessage);
     setStatus('Flyer generated!', 'success');
     return;
   }
@@ -985,9 +991,9 @@ function generateFlyer() {
   }
 
   // ---- Build main content ----
-  _buildFlyerContent(canvas, tag, title, subtitle, description, bullets, date, time, cta, link, uploadedImageSrc, selectedPos, btnLabel);
+  _buildFlyerContent(canvas, tag, title, subtitle, description, bullets, date, time, cta, link, uploadedImageSrc, selectedPos, btnLabel, extraMessage);
   _appendFooter(canvas);
-  buildSlackMessage(tag, title, subtitle, description, bullets, date, time, cta, link, btnLabel);
+  buildSlackMessage(tag, title, subtitle, description, bullets, date, time, cta, link, btnLabel, extraMessage);
   setStatus('Flyer generated!', 'success');
 }
 
@@ -998,7 +1004,7 @@ function _appendFooter(canvas) {
   canvas.appendChild(footer);
 }
 
-function _buildFlyerContent(canvas, tag, title, subtitle, description, bullets, date, time, cta, link, imgSrc, imgPos, btnLabel) {
+function _buildFlyerContent(canvas, tag, title, subtitle, description, bullets, date, time, cta, link, imgSrc, imgPos, btnLabel, extraMessage) {
   btnLabel = btnLabel || 'Register Now';
   // Build flyer HTML
   if (tag) {
@@ -1046,6 +1052,14 @@ function _buildFlyerContent(canvas, tag, title, subtitle, description, bullets, 
     canvas.appendChild(ul);
   }
 
+  // Extra message: after bullets
+  if (extraMessage) {
+    const extraEl = document.createElement('div');
+    extraEl.style.cssText = 'font-style:italic;font-size:0.95rem;color:var(--yellow);text-align:center;margin:14px 0;line-height:1.6;font-family:Nunito,sans-serif;font-weight:700;';
+    extraEl.textContent = extraMessage;
+    canvas.appendChild(extraEl);
+  }
+
   // Center image: after bullets
   if (imgSrc && imgPos === 'center') {
     const img = document.createElement('img');
@@ -1085,7 +1099,7 @@ function _buildFlyerContent(canvas, tag, title, subtitle, description, bullets, 
   if (cta || link) canvas.appendChild(ctaWrapper);
 }
 
-function buildSlackMessage(tag, title, subtitle, description, bullets, date, time, cta, link, btnLabel) {
+function buildSlackMessage(tag, title, subtitle, description, bullets, date, time, cta, link, btnLabel, extraMessage) {
   btnLabel = btnLabel || 'Register Now';
   const lines = [];
   if (tag) lines.push(`*${tag}*`);
@@ -1097,6 +1111,7 @@ function buildSlackMessage(tag, title, subtitle, description, bullets, date, tim
     bullets.forEach(b => lines.push(`• ${b}`));
     lines.push('');
   }
+  if (extraMessage) { lines.push(`_${extraMessage}_`); lines.push(''); }
   if (date || time) lines.push(`📅 *${[date, time].filter(Boolean).join(' · ')}*`);
   if (cta) lines.push(`\n${cta}`);
   if (link) lines.push(`🔗 ${btnLabel}: ${link}`);
